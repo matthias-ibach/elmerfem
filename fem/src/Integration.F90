@@ -1516,16 +1516,15 @@ CONTAINS
    SUBROUTINE GaussPointsInit
 !------------------------------------------------------------------------------
      INTEGER :: n, istat, thread, nthreads
-     TYPE(GaussIntegrationPoints_t), ALLOCATABLE :: tmp(:)
 
-     ! Determine the current team size BEFORE the critical section.
-     ! omp_get_max_threads() inside a parallel region with nested parallelism
-     ! off returns 1 (the nested-team max), not the outer team size.
-     ! omp_get_num_threads() returns the current team size (1 when serial).
-     ! Taking the max of the two covers both first-call-from-serial and
-     ! first-call-from-parallel scenarios.
+     ! omp_get_max_threads() returns OMP_NUM_THREADS (or the runtime default)
+     ! even when called from serial code, so it gives the correct upper bound
+     ! for how many threads may appear in any subsequent parallel region.
+     ! Using omp_get_num_threads() or omp_get_max_threads() from inside a
+     ! parallel region would give the nested-team max (typically 1), not the
+     ! outer team size.  Calling this from serial is safest and covers all cases.
      nthreads = 1
-     !$ nthreads = MAX( omp_get_num_threads(), omp_get_max_threads() )
+     !$ nthreads = omp_get_max_threads()
 
      !$OMP CRITICAL(GaussPointsInit_critical)
      IF ( .NOT. GInit ) THEN
@@ -1541,16 +1540,10 @@ CONTAINS
          NULLIFY( IntegStuff(n) % u, IntegStuff(n) % v, &
                   IntegStuff(n) % w, IntegStuff(n) % s )
        END DO
-     ELSE IF ( nthreads > SIZE(IntegStuff) ) THEN
-       ! A parallel region with more threads than anticipated: grow the array,
-       ! preserving existing per-thread allocations.
-       CALL MOVE_ALLOC( IntegStuff, tmp )
-       ALLOCATE( IntegStuff(nthreads) )
-       IntegStuff(1:SIZE(tmp)) = tmp
-       DO n=SIZE(tmp)+1, nthreads
-         NULLIFY( IntegStuff(n) % u, IntegStuff(n) % v, &
-                  IntegStuff(n) % w, IntegStuff(n) % s )
-       END DO
+       ! NOTE: IntegStuff is never reallocated after this point.  Reallocation
+       ! would invalidate existing pointers held by other threads (use-after-free).
+       ! Size is set to omp_get_max_threads() which is the correct upper bound
+       ! for all subsequent parallel regions.
      END IF
      !$OMP END CRITICAL(GaussPointsInit_critical)
 
@@ -1586,8 +1579,7 @@ CONTAINS
     IF ( .NOT. GInit ) CALL GaussPointsInit
     thread = 1
     !$ thread = omp_get_thread_num() + 1
-    IF ( thread > SIZE(IntegStuff) .OR. .NOT. ASSOCIATED( IntegStuff(thread) % u ) ) &
-        CALL GaussPointsInit
+    IF ( .NOT. ASSOCIATED( IntegStuff(thread) % u ) ) CALL GaussPointsInit
     p => IntegStuff(thread)
   END FUNCTION GetIntegStuff
 !------------------------------------------------------------------------------
