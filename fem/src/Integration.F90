@@ -1571,8 +1571,14 @@ CONTAINS
 !------------------------------------------------------------------------------
 !> Return a pointer to the calling thread's Gauss integration workspace,
 !> initialising it on first use.
+!> Implemented as a SUBROUTINE (not a FUNCTION) so that the pointer is passed
+!> via a dummy argument rather than as a function result.  Returning a pointer
+!> from a function called inside another pointer-result function can misfire on
+!> Windows x64 GFortran (MinGW/MSYS2) due to ABI differences in how aggregate
+!> return values are conveyed; a SUBROUTINE with a POINTER dummy argument is
+!> portable across all platforms.
 !------------------------------------------------------------------------------
-  FUNCTION GetIntegStuff() RESULT(p)
+  SUBROUTINE GetIntegStuff(p)
 !------------------------------------------------------------------------------
     TYPE(GaussIntegrationPoints_t), POINTER :: p
     INTEGER :: thread
@@ -1581,7 +1587,7 @@ CONTAINS
     !$ thread = omp_get_thread_num() + 1
     IF ( .NOT. ASSOCIATED( IntegStuff(thread) % u ) ) CALL GaussPointsInit
     p => IntegStuff(thread)
-  END FUNCTION GetIntegStuff
+  END SUBROUTINE GetIntegStuff
 !------------------------------------------------------------------------------
 
 
@@ -1592,7 +1598,7 @@ CONTAINS
       TYPE(GaussIntegrationPoints_t), POINTER :: p
 !     INTEGER :: thread, omp_get_thread_num
 
-      p => GetIntegStuff()
+      CALL GetIntegStuff(p)
       p % n = 1
       p % u(1) = 0
       p % v(1) = 0
@@ -1613,7 +1619,7 @@ CONTAINS
 !------------------------------------------------------------------------------
 !     INTEGER :: thread, omp_get_thread_num
 
-      p => GetIntegStuff()
+      CALL GetIntegStuff(p)
       IF ( n < 1 .OR. n > MAXN ) THEN
         p % n = 0
         WRITE( Message, * ) 'Invalid number of points: ',n
@@ -1637,7 +1643,7 @@ CONTAINS
       REAL (KIND=dp) :: uq, vq, sq
 !     INTEGER :: thread, omp_get_thread_num
 !------------------------------------------------------------------------------
-      p => GetIntegStuff()
+      CALL GetIntegStuff(p)
 
       ! Construct Gauss points for p (barycentric) triangle from
       ! Gauss points for quadrilateral
@@ -1682,7 +1688,7 @@ CONTAINS
          ConvertToPTriangle =  PReferenceElement
       END IF
 
-      p => GetIntegStuff()
+      CALL GetIntegStuff(p)
 
       SELECT CASE (n)
       CASE (1)
@@ -1785,7 +1791,7 @@ CONTAINS
       Economic = .FALSE.
       IF (PRESENT(PMethod)) Economic = PMethod
 
-      p => GetIntegStuff()
+      CALL GetIntegStuff(p)
 
       IF (Economic .AND. (np > 4) .AND. (np <= 60)) THEN
         !PRINT *, 'SELECTING A SPECIAL QUADRATURE FOR p-ELEMENTS'
@@ -1869,7 +1875,7 @@ CONTAINS
    REAL(KIND=dp) :: uh, vh, wh, sh
 !  INTEGER :: thread, omp_get_thread_num
 !------------------------------------------------------------------------------
-   p => GetIntegStuff()
+   CALL GetIntegStuff(p)
    n = DBLE(np)**(1.0D0/3.0D0) + 0.5D0
 
    ! Get Gauss points of p brick
@@ -1920,7 +1926,7 @@ CONTAINS
          ConvertToPTetrahedron =  PReferenceElement
       END IF
 
-      p => GetIntegStuff()
+      CALL GetIntegStuff(p)
 
       SELECT CASE (n)
       CASE (1)
@@ -2010,7 +2016,7 @@ CONTAINS
    TYPE(GaussIntegrationPoints_t), POINTER :: p
 !  INTEGER :: thread, omp_get_thread_num
 !------------------------------------------------------------------------------
-   p => GetIntegStuff()
+   CALL GetIntegStuff(p)
 
    n = DBLE(np)**(1.0D0/3.0D0) + 0.5D0
 
@@ -2049,7 +2055,7 @@ CONTAINS
       INTEGER :: i,j,k,n,t
 !       INTEGER :: thread, omp_get_thread_num
 
-      p => GetIntegStuff()
+      CALL GetIntegStuff(p)
 
       n = REAL(np)**(1.0D0/3.0D0) + 0.5D0
 
@@ -2093,7 +2099,7 @@ CONTAINS
    TYPE(GaussIntegrationPoints_t), POINTER :: p
 !   INTEGER :: thread, omp_get_thread_num
 !------------------------------------------------------------------------------
-   p => GetIntegStuff()
+   CALL GetIntegStuff(p)
 
    ! Get Gauss points of brick
    p = GaussPointsBrick(n)
@@ -2130,7 +2136,7 @@ CONTAINS
       INTEGER :: i,j,k,n,t
 !       INTEGER :: thread, omp_get_thread_num
 !------------------------------------------------------------------------------
-      p => GetIntegStuff()
+      CALL GetIntegStuff(p)
 
       n = REAL(np)**(1.0d0/3.0d0) + 0.5d0
 
@@ -2186,7 +2192,7 @@ CONTAINS
       IF ( PRESENT(PReferenceElement) ) THEN
          ConvertToPPrism =  PReferenceElement
       END IF
-      p => GetIntegStuff()
+      CALL GetIntegStuff(p)
 
       SELECT CASE (m)
       CASE (1)
@@ -2387,7 +2393,7 @@ CONTAINS
         ConvertToPWedge = PReferenceElement
       END IF
 
-      p => GetIntegStuff()
+      CALL GetIntegStuff(p)
 
       SELECT CASE (n)
       CASE (4)
@@ -2490,7 +2496,7 @@ CONTAINS
       INTEGER i,j,k,t
 !       INTEGER :: thread, omp_get_thread_num
 !------------------------------------------------------------------------------
-      p => GetIntegStuff()
+      CALL GetIntegStuff(p)
 
       ! Check validity of number of integration points
       IF ( nx < 1 .OR. nx > MAXN .OR. &
@@ -2531,7 +2537,7 @@ CONTAINS
       INTEGER i,j,k,n,t
 !      INTEGER :: thread, omp_get_thread_num
 
-      p => GetIntegStuff()
+      CALL GetIntegStuff(p)
 
       SELECT CASE( np )
       CASE( 8 )
@@ -2803,7 +2809,7 @@ CONTAINS
        pElement = isActivePElement(elm)
      END IF
 
-     ip => GetIntegStuff()
+     CALL GetIntegStuff(ip)
 
      ! Compute the number of corner nodes
      n = ecode / 100
@@ -2895,7 +2901,7 @@ CONTAINS
        pElement = isActivePElement(elm)
      END IF
 
-     ip => GetIntegStuff()
+     CALL GetIntegStuff(ip)
 
      ! Compute the number of corner nodes
      n = ecode / 100
