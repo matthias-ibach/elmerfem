@@ -46,6 +46,9 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      - name: unshallow Zoltan submodule
+        run: git -C contrib/Zoltan_v3.83 fetch --unshallow || true
+
       - name: install dependencies
         run: |
           sudo apt -qq update
