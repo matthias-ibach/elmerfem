@@ -1517,14 +1517,20 @@ CONTAINS
 !------------------------------------------------------------------------------
      INTEGER :: n, istat, thread, nthreads
 
-     ! omp_get_max_threads() returns OMP_NUM_THREADS (or the runtime default)
-     ! even when called from serial code, so it gives the correct upper bound
-     ! for how many threads may appear in any subsequent parallel region.
-     ! Using omp_get_num_threads() or omp_get_max_threads() from inside a
-     ! parallel region would give the nested-team max (typically 1), not the
-     ! outer team size.  Calling this from serial is safest and covers all cases.
+     ! Determine how many thread slots to allocate.  We take the maximum of:
+     !   omp_get_max_threads() -- the upper bound for any parallel region that
+     !                            lacks a num_threads clause (correct from serial
+     !                            context, but returns the *nested*-team max of 1
+     !                            when called from inside a parallel region).
+     !   omp_get_num_threads() -- the actual size of the current team (1 from
+     !                            serial, N from inside a parallel region).
+     ! The MAX ensures the right value is used regardless of where this routine
+     ! is first called.  In particular, GaussPointsInit may be called from the
+     ! !$OMP PARALLEL warm-up block in ElmerSolver (ExecSimulation), where
+     ! omp_get_max_threads() would return 1 for nested teams while the actual
+     ! team already has N > 1 threads.
      nthreads = 1
-     !$ nthreads = omp_get_max_threads()
+     !$ nthreads = MAX(omp_get_max_threads(), omp_get_num_threads())
 
      !$OMP CRITICAL(GaussPointsInit_critical)
      IF ( .NOT. GInit ) THEN
@@ -1542,8 +1548,8 @@ CONTAINS
        END DO
        ! NOTE: IntegStuff is never reallocated after this point.  Reallocation
        ! would invalidate existing pointers held by other threads (use-after-free).
-       ! Size is set to omp_get_max_threads() which is the correct upper bound
-       ! for all subsequent parallel regions.
+       ! Size is set to MAX(omp_get_max_threads(), omp_get_num_threads()) which
+       ! is the correct upper bound whether called from serial or parallel context.
      END IF
      !$OMP END CRITICAL(GaussPointsInit_critical)
 
@@ -1585,6 +1591,10 @@ CONTAINS
     IF ( .NOT. GInit ) CALL GaussPointsInit
     thread = 1
     !$ thread = omp_get_thread_num() + 1
+    IF ( thread > SIZE(IntegStuff) ) &
+        CALL Fatal('GetIntegStuff', 'Thread index exceeds IntegStuff slots — ' // &
+            'GaussPointsInit was called from a context where omp_get_num_threads()' // &
+            ' was not yet available; increase the slot count in GaussPointsInit.')
     IF ( .NOT. ASSOCIATED( IntegStuff(thread) % u ) ) CALL GaussPointsInit
     p => IntegStuff(thread)
   END SUBROUTINE GetIntegStuff
