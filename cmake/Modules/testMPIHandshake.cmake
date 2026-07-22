@@ -11,11 +11,22 @@ END PROGRAM test_mpi_handshake
 ")
 
 set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -I${XIOS_INCLUDE_DIR}")
-TRY_COMPILE(TEST_XIOS_HAS_MPI_HANDSHAKE
+#TRY_COMPILE(TEST_XIOS_HAS_MPI_HANDSHAKE
+#    ${CMAKE_BINARY_DIR}
+#    ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/test_xios_mpi_handshake.f90
+#    OUTPUT_VARIABLE OUTPUT
+#)
+
+try_compile(
+    TEST_XIOS_HAS_MPI_HANDSHAKE
     ${CMAKE_BINARY_DIR}
     ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/test_xios_mpi_handshake.f90
+    LINK_LIBRARIES ${XIOS_LIBRARY}
     OUTPUT_VARIABLE OUTPUT
 )
+
+message(STATUS "TRY_COMPILE output:")
+message(STATUS "${OUTPUT}")
 
 # Check if the compilation was successful
 IF(TEST_XIOS_HAS_MPI_HANDSHAKE)
